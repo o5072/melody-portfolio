@@ -23,3 +23,5 @@ The frontend runs on `http://localhost:3000` and proxies `/api` requests to the 
 Contact messages are stored locally in `data/messages.json`.
 
 On Vercel, `/api/health` and `/api/messages` are served by serverless functions in `api/`. For durable production message storage, connect a database or Vercel storage product before relying on contact messages long-term.
+
+On Netlify, `/api/health` and `/api/messages` are routed to serverless functions in `netlify/functions/` by `netlify.toml`.
