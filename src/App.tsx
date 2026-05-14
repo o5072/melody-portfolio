@@ -12,8 +12,7 @@ import {
   Mail, 
   ChevronRight, 
   Menu, 
-  X,
-  ExternalLink
+  X
 } from "lucide-react";
 import { useState, useRef, useEffect, FormEvent } from "react";
 
@@ -24,6 +23,8 @@ interface Project {
   category: string;
   image: string;
 }
+
+type SubmitStatus = "idle" | "sending" | "sent" | "error";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -49,7 +50,7 @@ const Navbar = () => {
     >
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
         <a href="#" className="text-xl font-display font-bold tracking-tighter">
-          VANTAGE<span className="text-brand-muted">.</span>
+          MELODY<span className="text-brand-muted">.</span>
         </a>
 
         {/* Desktop Nav */}
@@ -99,7 +100,7 @@ const Navbar = () => {
 
 const Hero = () => {
   return (
-    <section className="min-height-[90vh] flex flex-col justify-center px-6 pt-32 pb-20">
+    <section className="min-h-[90vh] flex flex-col justify-center px-6 pt-32 pb-20">
       <div className="max-w-7xl mx-auto w-full">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -206,7 +207,7 @@ const Work = () => {
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
           <h2 className="text-4xl md:text-6xl font-bold tracking-tighter">
             SELECTED PROJECTS <br />
-            <span className="text-brand-muted">2023 — PRES.</span>
+            <span className="text-brand-muted">2023 - PRES.</span>
           </h2>
           <p className="max-w-xs text-sm text-brand-muted uppercase tracking-widest leading-loose">
             A curation of works focused on minimalism, grid systems and typography.
@@ -270,12 +271,57 @@ const About = () => {
 };
 
 const ContactForm = () => {
-  const [submitted, setSubmitted] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [messageCount, setMessageCount] = useState<number | null>(null);
   
-  const handleSubmit = (e: FormEvent) => {
+  useEffect(() => {
+    const loadMessages = async () => {
+      try {
+        const response = await fetch("/api/messages");
+        const data = await response.json();
+        setMessageCount(Array.isArray(data.messages) ? data.messages.length : 0);
+      } catch {
+        setMessageCount(null);
+      }
+    };
+
+    loadMessages();
+  }, []);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 5000);
+    setSubmitStatus("sending");
+    setStatusMessage("");
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const payload = {
+      name: String(formData.get("name") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      message: String(formData.get("message") ?? ""),
+    };
+
+    try {
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not send your message.");
+      }
+
+      setSubmitStatus("sent");
+      setMessageCount((current) => (current ?? 0) + 1);
+      form.reset();
+      setTimeout(() => setSubmitStatus("idle"), 5000);
+    } catch (error) {
+      setSubmitStatus("error");
+      setStatusMessage(error instanceof Error ? error.message : "Could not send your message.");
+    }
   };
 
   return (
@@ -288,12 +334,17 @@ const ContactForm = () => {
               A PROJECT.
             </h2>
             <div className="flex flex-col gap-6 text-brand-muted">
-              <a href="mailto:hello@vantage.design" className="text-2xl hover:text-brand-accent transition-colors flex items-center gap-4">
-                hello@vantage.design <ArrowUpRight size={24} />
+              <a href="mailto:hello@melody.design" className="text-2xl hover:text-brand-accent transition-colors flex items-center gap-4">
+                hello@melody.design <ArrowUpRight size={24} />
               </a>
               <p className="max-w-xs text-sm uppercase tracking-widest leading-loose">
                 Currently accepting new commissions for Q3 2026.
               </p>
+              {messageCount !== null && (
+                <p className="max-w-xs text-xs uppercase tracking-widest text-brand-accent/60">
+                  {messageCount} message{messageCount === 1 ? "" : "s"} received.
+                </p>
+              )}
             </div>
             
             <div className="flex gap-8 mt-20">
@@ -304,7 +355,7 @@ const ContactForm = () => {
           </div>
 
           <div className="bg-white/5 p-8 md:p-12 rounded-3xl border border-white/5">
-            {submitted ? (
+            {submitStatus === "sent" ? (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -313,8 +364,8 @@ const ContactForm = () => {
                 <div className="w-16 h-16 rounded-full bg-brand-accent text-brand-bg flex items-center justify-center mb-6">
                   <Mail size={32} />
                 </div>
-                <h3 className="text-2xl font-bold mb-2">Message Recieved</h3>
-                <p className="text-brand-muted">We'll get back to you within 24 hours.</p>
+                <h3 className="text-2xl font-bold mb-2">Message Received</h3>
+                <p className="text-brand-muted">Melody will get back to you within 24 hours.</p>
               </motion.div>
             ) : (
               <form onSubmit={handleSubmit} className="flex flex-col gap-8">
@@ -322,24 +373,27 @@ const ContactForm = () => {
                   <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-muted">Name</label>
                   <input 
                     required
+                    name="name"
                     type="text" 
                     className="bg-transparent border-b border-white/20 py-4 outline-none focus:border-brand-accent transition-colors text-lg"
-                    placeholder="John Doe"
+                    placeholder="Your name"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-muted">Email</label>
                   <input 
                     required
+                    name="email"
                     type="email" 
                     className="bg-transparent border-b border-white/20 py-4 outline-none focus:border-brand-accent transition-colors text-lg"
-                    placeholder="john@example.com"
+                    placeholder="you@example.com"
                   />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-muted">Message</label>
                   <textarea 
                     required
+                    name="message"
                     rows={4}
                     className="bg-transparent border-b border-white/20 py-4 outline-none focus:border-brand-accent transition-colors text-lg resize-none"
                     placeholder="Tell us about your project"
@@ -348,10 +402,14 @@ const ContactForm = () => {
                 
                 <button 
                   type="submit"
+                  disabled={submitStatus === "sending"}
                   className="w-full bg-brand-accent text-brand-bg font-bold uppercase tracking-widest py-6 rounded-full hover:scale-[0.98] transition-transform active:scale-95 mt-4"
                 >
-                  Send Message
+                  {submitStatus === "sending" ? "Sending..." : "Send Message"}
                 </button>
+                {submitStatus === "error" && (
+                  <p className="text-sm text-red-300">{statusMessage}</p>
+                )}
               </form>
             )}
           </div>
@@ -365,7 +423,7 @@ const Footer = () => {
   return (
     <footer className="py-12 px-6 border-t border-white/5">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 text-xs text-brand-muted font-medium uppercase tracking-[0.2em]">
-        <p>© 2026 VANTAGE STUDIO. ALL RIGHTS RESERVED.</p>
+        <p>(c) 2026 MELODY. ALL RIGHTS RESERVED.</p>
         <div className="flex gap-12">
           <a href="#" className="hover:text-brand-accent transition-colors">Privacy</a>
           <a href="#" className="hover:text-brand-accent transition-colors">Terms</a>
